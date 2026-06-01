@@ -1,0 +1,9 @@
+{
+  "model_class": "Ridge",
+  "val_rmse": 0.12126596877541819,
+  "test_rmse": 0.12358168955355318,
+  "test_r2": 0.9102073693097286,
+  "test_mae_dollars": 84.04359630717201,
+  "n_features": 263,
+  "trained on": "ames_housing.csv"
+}
