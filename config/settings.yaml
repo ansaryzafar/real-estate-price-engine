@@ -1,0 +1,109 @@
+# =============================================================================
+# settings.yaml — Centralised configuration for the Real Estate Price Engine
+# =============================================================================
+# All paths are relative to the project root (the directory containing this
+# config/ folder). The Python code loads this file once at startup and accesses
+# values via cfg["section"]["key"] — no magic strings scattered across modules.
+#
+# INDUSTRY TIP: Never hardcode file paths or magic numbers in application code.
+# A single YAML config means a DevOps engineer can change a path for production
+# without touching Python. It also makes CI/CD parameterisation trivial.
+
+# ── Paths ─────────────────────────────────────────────────────────────────────
+paths:
+  data_dir:           "data"
+  processed_dir:      "data/processed"
+  raw_data:           "data/ames_housing.csv"
+  models_dir:         "models"
+
+# ── Model artefact file names (relative to models_dir) ────────────────────────
+model:
+  model_file:           "best_model.pkl"
+  preprocessor_file:    "preprocessor.pkl"       # lives in processed_dir
+  feature_names_file:   "feature_names.json"     # lives in processed_dir
+  metadata_file:        "model_metadata.json"
+
+  # Deployment quality gates — CI/CD pipeline rejects a new model if it misses
+  # either threshold. These match the business success criteria in PROJECT_OVERVIEW.
+  threshold_rmse_log:   0.14    # maximum acceptable test RMSE in log space
+  threshold_r2:         0.85    # minimum acceptable test R²
+
+# ── API settings ──────────────────────────────────────────────────────────────
+api:
+  title:        "Real Estate Price Prediction API"
+  description:  "Predicts residential sale price from property features (Ames Housing model)."
+  version:      "1.0.0"
+  port:         8000
+  log_level:    "INFO"
+
+  # Allowed CORS origins. Extend for your front-end domain in production.
+  # INDUSTRY TIP: In production, never use ["*"]. List specific origins.
+  cors_origins:
+    - "http://localhost:3000"
+    - "http://localhost:8080"
+
+# ── Prediction business rules ─────────────────────────────────────────────────
+# Clip predictions to a plausible range for Ames, Iowa residential properties.
+# A prediction outside this range indicates a data quality issue at the input
+# layer (e.g., a user submitted GrLivArea=99999) rather than a model failure.
+prediction:
+  min_price_dollars:  10_000
+  max_price_dollars:  800_000
+
+# ── Preprocessing constants (mirrors PREP_CFG in 02_preprocessing.ipynb) ──────
+# These values are used by src/data/preprocessing.py to replicate the exact
+# same transformations applied during training.
+#
+# IMPORTANT: Any change here must be matched by a full retrain + re-evaluation.
+# The values below must be identical to what was used when preprocessor.pkl
+# was fitted — changing them creates a train/serve skew.
+preprocessing:
+  target:             "SalePrice"
+  drop_cols:          ["Id", "Utilities"]
+  outlier_indices:    [523, 1298]
+  log_transform_target: true
+
+  fill_none_cols:
+    - PoolQC
+    - MiscFeature
+    - Alley
+    - Fence
+    - FireplaceQu
+    - GarageType
+    - GarageFinish
+    - GarageQual
+    - GarageCond
+    - BsmtQual
+    - BsmtCond
+    - BsmtExposure
+    - BsmtFinType1
+    - BsmtFinType2
+    - MasVnrType
+
+  fill_zero_cols:
+    - MasVnrArea
+    - GarageYrBlt
+    - GarageArea
+    - GarageCars
+    - BsmtFinSF1
+    - BsmtFinSF2
+    - BsmtUnfSF
+    - TotalBsmtSF
+
+  fill_mode_cols:
+    - Electrical
+    - MSZoning
+    - Exterior1st
+    - Exterior2nd
+    - SaleType
+
+  quality_cols:
+    - ExterQual
+    - ExterCond
+    - BsmtQual
+    - BsmtCond
+    - HeatingQC
+    - KitchenQual
+    - FireplaceQu
+    - GarageQual
+    - GarageCond
