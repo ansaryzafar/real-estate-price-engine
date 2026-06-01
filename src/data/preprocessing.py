@@ -148,6 +148,11 @@ def impute_lot_frontage(df: pd.DataFrame) -> pd.DataFrame:
     DataFrame with LotFrontage NaNs filled.
     """
     df = df.copy()
+    # At inference time the caller may omit LotFrontage entirely (None excluded
+    # from the feature dict). Treat an absent column identically to a NaN value
+    # so the neighbourhood-median imputation path handles it correctly.
+    if "LotFrontage" not in df.columns:
+        df["LotFrontage"] = np.nan
     group_median = df.groupby("Neighborhood")["LotFrontage"].transform("median")
     df["LotFrontage"] = df["LotFrontage"].fillna(group_median)
     df["LotFrontage"] = df["LotFrontage"].fillna(df["LotFrontage"].median())
@@ -183,11 +188,13 @@ def run_imputation(df: pd.DataFrame) -> pd.DataFrame:
             df[col] = df[col].fillna(0)
     for col in FILL_MODE_COLS:
         if col in df.columns:
-            df[col] = df[col].fillna(df[col].mode()[0])
+            mode_series = df[col].mode()
+            if not mode_series.empty:
+                df[col] = df[col].fillna(mode_series.iloc[0])
     null_count = df.isnull().sum().sum()
     if null_count > 0:
         still_null = df.columns[df.isnull().any()].tolist()
-        logger.warning("Nulls remain after imputation in: %s", still_null)
+        logger.debug("Nulls remain after domain imputation (ColumnTransformer will resolve): %s", still_null)
 
     return df
 
@@ -312,7 +319,21 @@ def preprocess_for_inference(
     """
     df = drop_identifiers(raw_df)
     logger.debug("After drop_identifiers: shape=%s, nulls=%d", df.shape, df.isnull().sum().sum())
-    
+
+    # Expand partial inference requests to the full 83-column input space.
+    # The API schema exposes only the most influential features; absent columns
+    # are added here as NaN so that run_imputation() applies domain-specific
+    # defaults (FILL_NONE_COLS, FILL_ZERO_COLS, FILL_MODE_COLS) and the
+    # ColumnTransformer's internal SimpleImputer resolves any remainder.
+    if hasattr(preprocessor, "feature_names_in_"):
+        expected = list(preprocessor.feature_names_in_)
+        missing = [c for c in expected if c not in df.columns]
+        if missing:
+            df = df.copy()
+            for col in missing:
+                df[col] = np.nan
+            logger.debug("Padded %d missing columns with NaN for inference", len(missing))
+
     df = impute_lot_frontage(df)
     logger.debug("After impute_lot_frontage: shape=%s, nulls=%d", df.shape, df.isnull().sum().sum())
     
