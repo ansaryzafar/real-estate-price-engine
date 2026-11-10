@@ -1,6 +1,6 @@
 # Real Estate Price Prediction Engine
 
-Week 1 Project -- Regression and Data Science Foundations
+
 
 ## Overview
 A complete regression pipeline that predicts real estate prices using multiple ML models, served via a production REST API.
